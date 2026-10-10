@@ -31,7 +31,7 @@ with any username and the password. Never commit the key or the password.
 | --- | --- | --- |
 | `GEMINI_API_KEY` | none | Required to find or draft. |
 | `MONTHLY_CAP_USD` | 5 | The agent stops when its estimated spend reaches this. |
-| `GEMINI_MODEL_SEARCH`, `_READ`, `_DRAFT` | `gemini-2.5-flash` | Swap any stage's model on its own. |
+| `GEMINI_MODEL_SEARCH`, `_READ`, `_DRAFT` | `gemini-3.8-flash` | Swap any stage's model on its own. |
 | `PRICE_IN_PER_M_USD`, `PRICE_OUT_PER_M_USD`, `PRICE_PER_SEARCH_USD` | 1, 5, 0.035 | Estimates. Set the provider's real rates; the defaults are deliberately high. |
 
 The spend shown is an estimate from token counts. For a hard limit, use prepaid credit with the

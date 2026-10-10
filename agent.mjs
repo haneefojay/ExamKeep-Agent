@@ -12,9 +12,9 @@ Never mention a price, a link, the pilot school's name, a quote, JAMB/WAEC/NECO 
 const cfg = (env) => ({
   key: env.GEMINI_API_KEY,
   base: env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta',
-  mSearch: env.GEMINI_MODEL_SEARCH || 'gemini-2.5-flash',
-  mRead: env.GEMINI_MODEL_READ || 'gemini-2.5-flash',
-  mDraft: env.GEMINI_MODEL_DRAFT || 'gemini-2.5-flash',
+  mSearch: env.GEMINI_MODEL_SEARCH || 'gemini-3.8-flash',
+  mRead: env.GEMINI_MODEL_READ || 'gemini-3.8-flash',
+  mDraft: env.GEMINI_MODEL_DRAFT || 'gemini-3.8-flash',
   // Estimates only. Set the real rates from the provider's pricing page; the defaults are deliberately high.
   inPerM: Number(env.PRICE_IN_PER_M_USD || 1),
   outPerM: Number(env.PRICE_OUT_PER_M_USD || 5),
