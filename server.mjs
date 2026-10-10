@@ -38,7 +38,7 @@ export function createServer(env = process.env, store = openStore(env.DATA_FILE 
 
   const publicSettings = () => {
     const r = resolve(store, env);
-    return { provider: r.provider, model: r.model, baseUrl: store.state.settings.baseUrl || '', keySet: !!r.key, keyHint: r.key ? '…' + r.key.slice(-4) : '', canSearch: r.canSearch, providers: Object.fromEntries(Object.entries(PROVIDERS).map(([k, v]) => [k, { label: v.label, model: v.model, base: v.base || '' }])) };
+    return { provider: r.provider, model: r.model, baseUrl: store.state.settings.baseUrl || '', searchModel: store.state.settings.searchModel || '', keySet: !!r.key, keyHint: r.key ? '…' + r.key.slice(-4) : '', canSearch: r.canSearch, providers: Object.fromEntries(Object.entries(PROVIDERS).map(([k, v]) => [k, { label: v.label, model: v.model, base: v.base || '' }])) };
   };
 
   const server = http.createServer(async (req, res) => {

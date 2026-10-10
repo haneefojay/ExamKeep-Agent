@@ -79,13 +79,13 @@ function renderLog() {
   if (!S.log.length) u.append(el('li', { className: 'meta', textContent: 'Nothing yet.' }));
   for (const g of S.log) u.append(el('li', {}, el('time', { textContent: when(g.at) }), el('span', { textContent: (g.school ? g.school + ': ' : '') + g.action + (g.extra ? ' (' + g.extra + ')' : '') })));
 }
-function syncBase() { $('m-base-row').hidden = $('m-provider').value !== 'custom'; }
+function syncBase() { $('m-search-row').hidden = $('m-provider').value !== 'gemini'; $('m-base-row').hidden = $('m-provider').value !== 'custom'; }
 function renderSettings() {
   const st = S.settings;
   if (!settingsShown) {
     settingsShown = true;
     for (const [k, v] of Object.entries(st.providers)) $('m-provider').append(el('option', { value: k, textContent: v.label }));
-    $('m-provider').value = st.provider; $('m-model').value = st.model; $('m-base').value = st.baseUrl; syncBase();
+    $('m-provider').value = st.provider; $('m-model').value = st.model; $('m-search').value = st.searchModel; $('m-base').value = st.baseUrl; syncBase();
     $('m-provider').onchange = () => { $('m-model').value = st.providers[$('m-provider').value].model; syncBase(); };
   }
   $('m-keyinfo').textContent = st.keySet ? 'A key is saved (' + st.keyHint + '). ' + (st.canSearch ? 'This provider can search the web for schools.' : 'This provider cannot search; use Add a school.') : 'No key saved yet.';
@@ -114,7 +114,7 @@ refresh();
 setInterval(() => { if (!editing) refresh(); }, S.job && S.job.running ? 4000 : 8000);
 
 async function saveModel() {
-  await api('/api/settings', { provider: $('m-provider').value, model: $('m-model').value, baseUrl: $('m-base').value, apiKey: $('m-key').value });
+  await api('/api/settings', { provider: $('m-provider').value, model: $('m-model').value, searchModel: $('m-search').value, baseUrl: $('m-base').value, apiKey: $('m-key').value });
   $('m-key').value = ''; await refresh();
 }
 $('m-save').onclick = async () => { try { await saveModel(); $('m-state').textContent = 'Saved'; } catch (e) { $('m-state').textContent = e.message; } };

@@ -20,7 +20,8 @@ export function resolve(store, env) {
   const base = provider === 'gemini'
     ? (env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta')
     : (provider === 'custom' ? s.baseUrl : p.base);
-  return { provider, key, model, base, canSearch: !!p.search };
+  const searchModel = provider === 'gemini' ? (s.searchModel || env.GEMINI_MODEL_SEARCH || model) : '';
+  return { provider, key, model, base, searchModel, canSearch: !!p.search };
 }
 
 export function validateSettings(b) {
@@ -30,6 +31,7 @@ export function validateSettings(b) {
     out.provider = b.provider;
   }
   if (typeof b.model === 'string') out.model = b.model.trim().slice(0, 120);
+  if (typeof b.searchModel === 'string') out.searchModel = b.searchModel.trim().slice(0, 120);
   if (typeof b.apiKey === 'string' && b.apiKey.trim()) out.apiKey = b.apiKey.trim().slice(0, 400);
   if (typeof b.baseUrl === 'string') {
     const u = b.baseUrl.trim();
@@ -44,7 +46,7 @@ export async function complete(cfg, prompt, { search = false } = {}) {
   if (!cfg.key) throw new Error('No API key set. Add one under Settings.');
   if (!cfg.model) throw new Error('No model set. Add one under Settings.');
   if (cfg.provider === 'gemini') {
-    const res = await fetch(`${cfg.base}/models/${cfg.model}:generateContent`, {
+    const res = await fetch(`${cfg.base}/models/${search && cfg.searchModel ? cfg.searchModel : cfg.model}:generateContent`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': cfg.key },
       body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], ...(search ? { tools: [{ google_search: {} }] } : {}) }),
