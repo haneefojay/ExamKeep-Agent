@@ -40,3 +40,13 @@ provider so nothing is billed past the balance.
 ## Test
 
 `node --test test/` (the model is mocked; no key needed). Not yet run against the real Gemini API.
+
+## Deploy on Railway
+
+1. New project, deploy from this GitHub repo. Railway detects Node and runs `npm start`.
+2. Add a volume mounted at `/data`.
+3. Variables: `HOST=0.0.0.0`, `DATA_FILE=/data/state.json`, `OUTREACH_PASSWORD` (12+ characters),
+   `GEMINI_API_KEY`, `MONTHLY_CAP_USD`. Railway sets `PORT` itself.
+4. Generate a public domain, open it, and sign in with any username and the password.
+
+The queue is a file, so without the volume it is lost on every redeploy. Keep one instance only.
