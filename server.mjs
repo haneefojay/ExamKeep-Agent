@@ -6,7 +6,8 @@ import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { openStore } from './store.mjs';
-import { runBatch, BRIEF } from './agent.mjs';
+import { runBatch, addSchool, BRIEF } from './agent.mjs';
+import { PROVIDERS, resolve, validateSettings, complete } from './llm.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const STATUS_FLOW = { approved: ['sent'], sent: ['replied'], replied: ['demo'] };
@@ -35,6 +36,11 @@ export function createServer(env = process.env, store = openStore(env.DATA_FILE 
     req.on('end', () => { try { ok(JSON.parse(Buffer.concat(parts).toString() || '{}')); } catch (e) { no(e); } });
   });
 
+  const publicSettings = () => {
+    const r = resolve(store, env);
+    return { provider: r.provider, model: r.model, baseUrl: store.state.settings.baseUrl || '', keySet: !!r.key, keyHint: r.key ? '…' + r.key.slice(-4) : '', canSearch: r.canSearch, providers: Object.fromEntries(Object.entries(PROVIDERS).map(([k, v]) => [k, { label: v.label, model: v.model, base: v.base || '' }])) };
+  };
+
   const server = http.createServer(async (req, res) => {
     try {
       if (!authed(req)) { res.setHeader('www-authenticate', 'Basic realm="ExamKeep outreach"'); return send(res, 401, { error: 'sign in' }); }
@@ -43,7 +49,7 @@ export function createServer(env = process.env, store = openStore(env.DATA_FILE 
       if (req.method === 'GET' && url.pathname === '/app.js') return send(res, 200, readFileSync(join(here, 'public', 'app.js')), 'text/javascript; charset=utf-8');
       if (req.method === 'GET' && url.pathname === '/api/state') {
         const s = store.state;
-        return send(res, 200, { prospects: Object.values(s.prospects), criteria: s.criteria, usage: { ...store.usage(), cap: Number(env.MONTHLY_CAP_USD || 5) }, job: s.job, log: s.log.slice(0, 200), brief: BRIEF });
+        return send(res, 200, { prospects: Object.values(s.prospects), criteria: s.criteria, usage: { ...store.usage(), cap: Number(env.MONTHLY_CAP_USD || 5) }, job: s.job, log: s.log.slice(0, 200), brief: BRIEF, settings: publicSettings() });
       }
       if (req.method === 'POST') {
         if (req.headers['x-requested-with'] !== 'examkeep') return send(res, 403, { error: 'missing header' });
@@ -68,6 +74,23 @@ export function createServer(env = process.env, store = openStore(env.DATA_FILE 
           for (const k of ['area', 'fit', 'skip']) if (typeof body[k] === 'string') store.state.criteria[k] = body[k].slice(0, 1000);
           store.log('', 'criteria updated'); store.save();
           return send(res, 200, { ok: true });
+        }
+        if (url.pathname === '/api/settings') {
+          Object.assign(store.state.settings, validateSettings(body));
+          store.log('', 'model settings changed', resolve(store, env).provider);
+          store.save();
+          return send(res, 200, { ok: true });
+        }
+        if (url.pathname === '/api/settings/test') {
+          try { const r = await complete(resolve(store, env), 'Reply with the single word: ready'); return send(res, 200, { ok: true, reply: r.text.slice(0, 80) }); }
+          catch (e) { return send(res, 200, { ok: false, error: e.message }); }
+        }
+        if (url.pathname === '/api/add') {
+          if (store.state.job.running) return send(res, 409, { error: 'A batch is already running' });
+          const name = String(body.name || '').trim().slice(0, 120), website = String(body.website || '').trim().slice(0, 300);
+          try { if (!name || !/^https?:\/\//.test(website)) throw new Error(); } catch { return send(res, 400, { error: 'Give the school name and a website starting with https://' }); }
+          addSchool(store, env, { name, website }, deps).catch(() => {});
+          return send(res, 202, { started: true });
         }
         if (url.pathname === '/api/run') {
           if (store.state.job.running) return send(res, 409, { error: 'A batch is already running' });

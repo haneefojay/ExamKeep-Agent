@@ -2,6 +2,7 @@
 // from the school's own public page), draft (write the message). Nothing here sends anything.
 import { lookup } from 'node:dns/promises';
 import net from 'node:net';
+import { resolve, complete } from './llm.mjs';
 
 export const BRIEF = `You write for ExamKeep, a computer-based exam platform for Nigerian secondary schools.
 Allowed claims only: a school's own exams run on its lab computers; each student has their own timer kept by the server;
@@ -10,11 +11,6 @@ objective papers are marked on submit; works on ordinary computers; we ran our f
 Never mention a price, a link, the pilot school's name, a quote, JAMB/WAEC/NECO links, or legal compliance. Never promise anything.`;
 
 const cfg = (env) => ({
-  key: env.GEMINI_API_KEY,
-  base: env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta',
-  mSearch: env.GEMINI_MODEL_SEARCH || 'gemini-3.8-flash',
-  mRead: env.GEMINI_MODEL_READ || 'gemini-3.8-flash',
-  mDraft: env.GEMINI_MODEL_DRAFT || 'gemini-3.8-flash',
   // Estimates only. Set the real rates from the provider's pricing page; the defaults are deliberately high.
   inPerM: Number(env.PRICE_IN_PER_M_USD || 1),
   outPerM: Number(env.PRICE_OUT_PER_M_USD || 5),
@@ -26,24 +22,16 @@ export function slug(s) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
 }
 
-async function gemini(store, env, model, body, { search = false } = {}) {
+export async function ask(store, env, _model, body, { search = false } = {}) {
   const c = cfg(env);
-  if (!c.key) throw new Error('GEMINI_API_KEY is not set');
   const u = store.usage();
   if (u.usd >= c.cap) throw new Error(`Monthly cap of $${c.cap} reached ($${u.usd.toFixed(2)} spent)`);
-  const res = await fetch(`${c.base}/models/${model}:generateContent`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-goog-api-key': c.key },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(90_000),
-  });
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const data = await res.json();
-  const m = data.usageMetadata || {};
-  u.usd += ((m.promptTokenCount || 0) * c.inPerM + (m.candidatesTokenCount || 0) * c.outPerM) / 1e6;
+  const prompt = body.contents[0].parts[0].text;
+  const r = await complete(resolve(store, env), prompt, { search });
+  u.usd += (r.inTok * c.inPerM + r.outTok * c.outPerM) / 1e6;
   if (search) { u.searches += 1; u.usd += c.perSearch; }
   store.save();
-  return (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
+  return r.text;
 }
 
 export function parseJson(text, open = '[') {
@@ -81,7 +69,7 @@ export async function discover(store, env, count) {
   const k = store.state.criteria;
   const known = Object.values(store.state.prospects).map((p) => p.name).join('; ') || 'none';
   const prompt = `Find up to ${count} real schools that are NOT in this list: ${known}.\nWhere: ${k.area}\nPrefer: ${k.fit}\nSkip: ${k.skip}\nUse web search. Return ONLY a JSON array of {"name":"","website":"https://..."} using each school's own website when one exists.`;
-  const text = await gemini(store, env, cfg(env).mSearch, { contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ google_search: {} }] }, { search: true });
+  const text = await ask(store, env, null, { contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ google_search: {} }] }, { search: true });
   return parseJson(text).filter((x) => x && x.name && x.website).slice(0, count);
 }
 
@@ -90,7 +78,7 @@ export async function readSchool(store, env, cand, fetchImpl = fetch) {
   const first = cand.name.toLowerCase().split(/\s+/).filter((w) => w.length > 3)[0] || cand.name.toLowerCase();
   if (!page.text.toLowerCase().includes(first)) throw new Error('page does not mention the school');
   const prompt = `From this school website text only, return ONLY a JSON object: {"area":"","type":"","tier":"A|B|C","reason":"one sentence citing what the page says","channel":"email|phone|WhatsApp"}.\nTier A = proprietor-led or privately run, shows an ICT/computer lab or CBT use, and runs its own exams. B = fits but little lab evidence. C = possible.\nSay "not stated" for anything the text does not show. Do not guess.\nSchool: ${cand.name}\nText:\n${page.text.slice(0, 9000)}`;
-  const out = parseJson(await gemini(store, env, cfg(env).mRead, { contents: [{ role: 'user', parts: [{ text: prompt }] }] }), '{');
+  const out = parseJson(await ask(store, env, null, { contents: [{ role: 'user', parts: [{ text: prompt }] }] }), '{');
   const emails = [...new Set(page.text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g) || [])].slice(0, 3);
   const phones = [...new Set(page.text.match(/(?:\+234|0)[789]\d[\s-]?\d{3,4}[\s-]?\d{3,4}/g) || [])].slice(0, 3);
   return { ...out, sourceUrl: page.url, contact: [...emails, ...phones].join(', ') };
@@ -102,9 +90,40 @@ export function draftOk(d) {
 
 export async function draftMessage(store, env, p) {
   const prompt = `${BRIEF}\nWrite a three-line first message from Haneef (founder) to the proprietor or principal of ${p.name}. Line 1 gives one specific, true reason for writing, taken only from this fact: ${p.reason}\nLine 2 states what ExamKeep does using only the allowed claims. Line 3 asks: "May I show you in 15 minutes at your school? - Haneef". Plain, polite Nigerian business English, no flattery, no emoji. Return only the message.`;
-  const d = (await gemini(store, env, cfg(env).mDraft, { contents: [{ role: 'user', parts: [{ text: prompt }] }] })).trim();
+  const d = (await ask(store, env, null, { contents: [{ role: 'user', parts: [{ text: prompt }] }] })).trim();
   if (!draftOk(d)) throw new Error('draft broke a rule (price, link or forbidden name)');
   return d;
+}
+
+async function processCandidate(store, env, c, deps) {
+  const j = store.state.job;
+  j.message = `Reading ${c.name}`; store.save();
+  const r = await readSchool(store, env, c, deps.fetch);
+  const p = { id: slug(c.name), name: c.name, area: r.area, type: r.type, tier: ['A', 'B', 'C'].includes(r.tier) ? r.tier : 'C', reason: r.reason, sourceUrl: r.sourceUrl, channel: r.channel, contact: r.contact, status: 'pending', createdAt: new Date().toISOString() };
+  if (store.state.prospects[p.id]) throw new Error('already in the queue');
+  j.message = `Drafting for ${c.name}`; store.save();
+  p.draft = await draftMessage(store, env, p);
+  store.state.prospects[p.id] = p;
+  store.log(p.name, 'added by agent', `tier ${p.tier}`);
+}
+
+const STOP = /^Monthly cap|No API key|No model|No base URL|cannot search/;
+
+// Works with every provider: you name the school and its website, the agent reads and drafts.
+export async function addSchool(store, env, cand, deps = {}) {
+  const j = store.state.job;
+  if (j.running) throw new Error('A batch is already running');
+  Object.assign(j, { running: true, message: `Reading ${cand.name}`, startedAt: new Date().toISOString() });
+  store.save();
+  try {
+    await processCandidate(store, env, cand, deps);
+    j.message = `Done: ${cand.name} added`;
+    return { added: 1 };
+  } catch (e) {
+    j.message = `Stopped: ${e.message}`;
+    store.log(cand.name, 'could not add', e.message);
+    return { added: 0, error: e.message };
+  } finally { j.running = false; store.save(); }
 }
 
 export async function runBatch(store, env, count = 5, deps = {}) {
@@ -117,17 +136,11 @@ export async function runBatch(store, env, count = 5, deps = {}) {
   try {
     const cands = await discover(store, env, Math.min(count, 10));
     for (const c of cands) {
-      j.message = `Reading ${c.name}`; store.save();
       try {
-        const r = await readSchool(store, env, c, deps.fetch);
-        const p = { id: slug(c.name), name: c.name, area: r.area, type: r.type, tier: ['A', 'B', 'C'].includes(r.tier) ? r.tier : 'C', reason: r.reason, sourceUrl: r.sourceUrl, channel: r.channel, contact: r.contact, status: 'pending', createdAt: new Date().toISOString() };
-        j.message = `Drafting for ${c.name}`; store.save();
-        p.draft = await draftMessage(store, env, p);
-        store.state.prospects[p.id] = p;
-        store.log(p.name, 'added by agent', `tier ${p.tier}`);
+        await processCandidate(store, env, c, deps);
         added += 1;
       } catch (e) {
-        if (/^Monthly cap/.test(e.message) || /GEMINI_API_KEY/.test(e.message)) throw e;
+        if (STOP.test(e.message)) throw e;
         skipped.push(`${c.name}: ${e.message}`);
         store.log(c.name, 'skipped', e.message);
       }

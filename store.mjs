@@ -10,6 +10,7 @@ const EMPTY = () => ({
     fit: 'Private secondary schools run by a proprietor, with an ICT lab or one being built, that run their own internal exams. Bigger schools first within a tier.',
     skip: 'Schools already happy with a CBT system, public schools without a proprietor, and primary-only schools.',
   },
+  settings: { provider: '', model: '', baseUrl: '', apiKey: '' },
   usage: { month: '', usd: 0, searches: 0 },
   job: { running: false, message: '', startedAt: '' },
 });

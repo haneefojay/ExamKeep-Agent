@@ -50,3 +50,13 @@ provider so nothing is billed past the balance.
 4. Generate a public domain, open it, and sign in with any username and the password.
 
 The queue is a file, so without the volume it is lost on every redeploy. Keep one instance only.
+
+## Choosing the model from the page
+
+Open the **Model** tab: pick a provider (Gemini, OpenAI, Groq, OpenRouter, or any OpenAI-compatible
+address), type the model name, paste the API key, and use **Save and test**. The key is kept in the
+state file on the server volume and is never sent back to the page. Page settings override
+`LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY` and `GEMINI_API_KEY`.
+
+Only Gemini can search the web, so **Find more schools** needs Gemini. With any provider you can use
+**Add a school** (name and website) and the agent reads the school's page and drafts the message.

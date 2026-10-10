@@ -3,7 +3,7 @@ const STATUSES = { pending: 'Waiting', approved: 'Approved', sent: 'Sent', repli
 const NEXT = { approved: 'Mark sent', sent: 'Mark replied', replied: 'Demo booked' };
 const $ = (id) => document.getElementById(id);
 let S = { prospects: [], log: [], criteria: {}, usage: {}, job: {} };
-let filter = 'pending', editing = null, criteriaShown = false;
+let filter = 'pending', editing = null, criteriaShown = false, settingsShown = false;
 
 function el(tag, props, ...kids) { const n = document.createElement(tag); Object.assign(n, props || {}); for (const k of kids) n.append(k); return n; }
 function when(iso) { try { return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
@@ -79,6 +79,17 @@ function renderLog() {
   if (!S.log.length) u.append(el('li', { className: 'meta', textContent: 'Nothing yet.' }));
   for (const g of S.log) u.append(el('li', {}, el('time', { textContent: when(g.at) }), el('span', { textContent: (g.school ? g.school + ': ' : '') + g.action + (g.extra ? ' (' + g.extra + ')' : '') })));
 }
+function syncBase() { $('m-base-row').hidden = $('m-provider').value !== 'custom'; }
+function renderSettings() {
+  const st = S.settings;
+  if (!settingsShown) {
+    settingsShown = true;
+    for (const [k, v] of Object.entries(st.providers)) $('m-provider').append(el('option', { value: k, textContent: v.label }));
+    $('m-provider').value = st.provider; $('m-model').value = st.model; $('m-base').value = st.baseUrl; syncBase();
+    $('m-provider').onchange = () => { $('m-model').value = st.providers[$('m-provider').value].model; syncBase(); };
+  }
+  $('m-keyinfo').textContent = st.keySet ? 'A key is saved (' + st.keyHint + '). ' + (st.canSearch ? 'This provider can search the web for schools.' : 'This provider cannot search; use Add a school.') : 'No key saved yet.';
+}
 function render() {
   renderStrip(); renderFilters();
   if (!(editing && document.activeElement && document.activeElement.tagName === 'TEXTAREA')) renderList();
@@ -86,13 +97,14 @@ function render() {
   $('job').textContent = S.job.message || '';
   $('run').disabled = !!S.job.running;
   $('brief').textContent = S.brief || '';
+  if (S.settings) renderSettings();
   if (!criteriaShown && S.criteria.area !== undefined) { criteriaShown = true; $('c-area').value = S.criteria.area; $('c-fit').value = S.criteria.fit; $('c-skip').value = S.criteria.skip; }
 }
 
 for (const b of document.querySelectorAll('#tabs button')) {
   b.onclick = () => {
     for (const x of document.querySelectorAll('#tabs button')) x.setAttribute('aria-selected', String(x === b));
-    for (const t of ['queue', 'criteria', 'brief', 'log']) $('tab-' + t).hidden = t !== b.dataset.tab;
+    for (const t of ['queue', 'criteria', 'settings', 'brief', 'log']) $('tab-' + t).hidden = t !== b.dataset.tab;
   };
 }
 $('b-copy').onclick = async () => { try { await navigator.clipboard.writeText(S.brief || ''); $('b-state').textContent = 'Copied'; } catch (e) { $('b-state').textContent = 'Select the text and copy'; } };
@@ -100,3 +112,11 @@ $('c-save').onclick = async () => { try { await api('/api/criteria', { area: $('
 $('run').onclick = async () => { try { await api('/api/run', { count: Number($('run-n').value) }); await refresh(); } catch (e) { $('job').textContent = e.message; } };
 refresh();
 setInterval(() => { if (!editing) refresh(); }, S.job && S.job.running ? 4000 : 8000);
+
+async function saveModel() {
+  await api('/api/settings', { provider: $('m-provider').value, model: $('m-model').value, baseUrl: $('m-base').value, apiKey: $('m-key').value });
+  $('m-key').value = ''; await refresh();
+}
+$('m-save').onclick = async () => { try { await saveModel(); $('m-state').textContent = 'Saved'; } catch (e) { $('m-state').textContent = e.message; } };
+$('m-test').onclick = async () => { try { await saveModel(); $('m-state').textContent = 'Testing'; const r = await api('/api/settings/test', {}); $('m-state').textContent = r.ok ? 'Works: ' + r.reply : 'Failed: ' + r.error; } catch (e) { $('m-state').textContent = e.message; } };
+$('add-go').onclick = async () => { try { await api('/api/add', { name: $('add-name').value, website: $('add-site').value }); $('add-name').value = ''; $('add-site').value = ''; await refresh(); } catch (e) { $('job').textContent = e.message; } };

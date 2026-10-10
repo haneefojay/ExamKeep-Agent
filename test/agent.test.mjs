@@ -49,7 +49,7 @@ test('refuses to start with a weak password', () => {
 test('batch stops at the monthly cap and never sends anything', async () => {
   const store = openStore(tmp());
   store.usage().usd = 5;
-  const r = await runBatch(store, { GEMINI_API_KEY: 'k', MONTHLY_CAP_USD: '5' }, 3);
+  const r = await runBatch(store, { GEMINI_API_KEY: 'k', LLM_PROVIDER: 'gemini', MONTHLY_CAP_USD: '5' }, 3);
   assert.match(r.error, /Monthly cap/);
   assert.equal(store.state.job.running, false);
 });
@@ -67,7 +67,7 @@ test('batch with a mocked model adds a verified, drafted school', async () => {
   };
   try {
     const page = async () => new Response('<html>Example Grammar School ICT laboratory info@example.com 08031234567</html>');
-    const r = await runBatch(store, { GEMINI_API_KEY: 'k' }, 1, { fetch: page });
+    const r = await runBatch(store, { GEMINI_API_KEY: 'k', LLM_PROVIDER: 'gemini' }, 1, { fetch: page });
     assert.equal(r.added, 1, JSON.stringify(r));
     const p = store.state.prospects['example-grammar-school'];
     assert.equal(p.status, 'pending');
@@ -81,4 +81,43 @@ test('page fetch refuses private and local addresses', async () => {
   for (const u of ['http://127.0.0.1/', 'http://10.0.0.5/', 'http://192.168.1.1/', 'http://169.254.169.254/', 'file:///etc/passwd']) {
     await assert.rejects(() => fetchText(u, async () => new Response('x')), undefined, u);
   }
+});
+
+test('settings: provider, model and key come from the page and the key is never returned', async () => {
+  const { server } = createServer({ ...ENV, DATA_FILE: tmp() }, openStore(tmp()));
+  await new Promise((r) => server.listen(0, r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const h = { authorization: auth, 'content-type': 'application/json', 'x-requested-with': 'examkeep' };
+  const bad = await fetch(base + '/api/settings', { method: 'POST', headers: h, body: JSON.stringify({ provider: 'custom', baseUrl: 'http://insecure.example' }) });
+  assert.equal(bad.status, 400);
+  const ok = await fetch(base + '/api/settings', { method: 'POST', headers: h, body: JSON.stringify({ provider: 'groq', model: 'm1', apiKey: 'gsk_secretvalue1234' }) });
+  assert.equal(ok.status, 200);
+  const raw = await (await fetch(base + '/api/state', { headers: { authorization: auth } })).text();
+  assert.ok(!raw.includes('secretvalue'));
+  const st = JSON.parse(raw).settings;
+  assert.equal(st.provider, 'groq'); assert.equal(st.keyHint, '…1234'); assert.equal(st.canSearch, false);
+  server.close();
+});
+
+test('OpenAI-compatible provider drafts a school added by hand; search is refused', async () => {
+  const store = openStore(tmp());
+  Object.assign(store.state.settings, { provider: 'groq', model: 'm1', apiKey: 'k' });
+  const realFetch = globalThis.fetch;
+  let n = 0;
+  const chat = (text) => new Response(JSON.stringify({ choices: [{ message: { content: text } }], usage: { prompt_tokens: 10, completion_tokens: 5 } }));
+  globalThis.fetch = async (url, init) => {
+    assert.match(String(url), /groq\.com\/openai\/v1\/chat\/completions/);
+    assert.equal(init.headers.authorization, 'Bearer k');
+    n += 1;
+    return n === 1 ? chat('{"area":"Ibadan","type":"private","tier":"B","reason":"Its page lists an ICT laboratory.","channel":"email"}')
+      : chat('Good day. I saw that Hand Added College lists an ICT laboratory.\nExamKeep runs your own exams on lab computers and keeps every answer if the network drops.\nMay I show you in 15 minutes at your school? - Haneef');
+  };
+  try {
+    const { addSchool } = await import('../agent.mjs');
+    const page = async () => new Response('<html>Hand Added College ICT laboratory</html>');
+    const r = await addSchool(store, {}, { name: 'Hand Added College', website: 'https://93.184.216.34/' }, { fetch: page });
+    assert.equal(r.added, 1, JSON.stringify(r));
+    const s2 = await runBatch(store, {}, 1);
+    assert.match(s2.error, /cannot search the web/);
+  } finally { globalThis.fetch = realFetch; }
 });

@@ -74,12 +74,14 @@ pre.brief { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--ca
   <nav role="tablist" id="tabs">
     <button role="tab" data-tab="queue" aria-selected="true">Queue</button>
     <button role="tab" data-tab="criteria" aria-selected="false">Criteria</button>
+    <button role="tab" data-tab="settings" aria-selected="false">Model</button>
     <button role="tab" data-tab="brief" aria-selected="false">Agent brief</button>
     <button role="tab" data-tab="log" aria-selected="false">Log</button>
   </nav>
 
   <section id="tab-queue">
     <div class="actions" style="margin-top:16px"><label for="run-n" style="margin:0;font-weight:400">Find</label><select id="run-n" style="width:auto"><option>3</option><option selected>5</option><option>10</option></select><button class="btn pri" id="run">Find more schools</button><span class="meta" id="job" role="status"></span></div>
+    <div class="actions" style="margin-top:12px"><label for="add-name" style="margin:0;font-weight:400">Add a school</label><input id="add-name" placeholder="School name" style="width:auto"><input id="add-site" placeholder="https://school website" style="width:auto"><button class="btn" id="add-go">Read and draft</button></div>
     <div class="filters" id="filters"></div>
     <div class="list" id="list"></div>
   </section>
@@ -93,6 +95,19 @@ pre.brief { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--ca
     <label for="c-skip">Who to skip</label>
     <textarea id="c-skip"></textarea>
     <p class="actions" style="margin-top:14px"><button class="btn pri" id="c-save">Save criteria</button><span class="meta" id="c-state" role="status"></span></p>
+  </section>
+
+  <section id="tab-settings" hidden>
+    <p class="note">Choose which AI model does the research and drafting. The key is stored on the server only and is never shown again. Finding new schools by web search needs Gemini; every provider can read a school you add by name and website.</p>
+    <label for="m-provider">Provider</label>
+    <select id="m-provider"></select>
+    <label for="m-model">Model</label>
+    <input id="m-model" autocomplete="off">
+    <div id="m-base-row" hidden><label for="m-base">Base URL (OpenAI-compatible, https)</label><input id="m-base" autocomplete="off"></div>
+    <label for="m-key">API key</label>
+    <input id="m-key" type="password" autocomplete="off" placeholder="Leave empty to keep the current key">
+    <p class="meta" id="m-keyinfo"></p>
+    <p class="actions" style="margin-top:14px"><button class="btn pri" id="m-save">Save</button><button class="btn" id="m-test">Save and test</button><span class="meta" id="m-state" role="status"></span></p>
   </section>
 
   <section id="tab-brief" hidden>
