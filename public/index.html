@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ExamKeep Outreach Queue</title>
+<style>
+/* Layout: one working column; summary strip on top, tabs, then cards as ruled exercise-book entries with a red margin rule. */
+:root {
+  --paper: #f7f8fb; --card: #ffffff; --ink: #1d2433; --muted: #5d6578; --rule: #d9deea;
+  --blue: #2c55b8; --blue-soft: #e6edfb; --margin: #c8362d;
+  --good: #1f7a4d; --good-soft: #e1f3ea; --warn: #8a5a00; --warn-soft: #fbefd2; --bad: #a3271f; --bad-soft: #f9e2df;
+  --display: "Literata", Georgia, serif; --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #111623; --card: #1a2133; --ink: #e8ecf6; --muted: #9aa4bd; --rule: #2d3752;
+  --blue: #8aa8f0; --blue-soft: #22305a; --margin: #ec7a72;
+  --good: #6fd0a0; --good-soft: #17382a; --warn: #e8c46a; --warn-soft: #3a2f10; --bad: #f09088; --bad-soft: #3d1c19; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --paper: #111623; --card: #1a2133; --ink: #e8ecf6; --muted: #9aa4bd; --rule: #2d3752;
+  --blue: #8aa8f0; --blue-soft: #22305a; --margin: #ec7a72;
+  --good: #6fd0a0; --good-soft: #17382a; --warn: #e8c46a; --warn-soft: #3a2f10; --bad: #f09088; --bad-soft: #3d1c19; color-scheme: dark; }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5; padding-inline: 16px; padding-block: 24px 64px; }
+main { max-width: 860px; margin: 0 auto; }
+h1, h2 { font-family: var(--display); font-weight: 600; text-wrap: balance; margin: 0; }
+h1 { font-size: 1.7rem; border-left: 4px solid var(--margin); padding-left: 12px; }
+h2 { font-size: 1.15rem; }
+.sub { color: var(--muted); margin: 6px 0 0 16px; max-width: 62ch; }
+.strip { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 22px 0 8px; font-variant-numeric: tabular-nums; }
+.strip b { font-size: 1.3rem; font-family: var(--display); margin-right: 4px; }
+.strip span { color: var(--muted); }
+nav[role=tablist] { display: flex; gap: 4px; border-bottom: 1px solid var(--rule); margin-top: 12px; overflow-x: auto; }
+nav button { background: none; border: 0; padding: 10px 14px; font: inherit; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+nav button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--blue); font-weight: 600; }
+button, select, textarea, input { font: inherit; color: inherit; }
+button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.chip { border: 1px solid var(--rule); background: var(--card); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: .9rem; }
+.chip[aria-pressed=true] { background: var(--blue-soft); border-color: var(--blue); color: var(--blue); font-weight: 600; }
+.list { display: flex; flex-direction: column; gap: 14px; }
+.item { background: var(--card); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; justify-content: space-between; }
+.head h2 { overflow-wrap: anywhere; }
+.meta { color: var(--muted); font-size: .92rem; }
+.pill { font-size: .78rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; letter-spacing: .02em; text-transform: uppercase; }
+.pill.A { background: var(--blue-soft); color: var(--blue); }
+.pill.B { background: var(--warn-soft); color: var(--warn); }
+.pill.C { background: var(--rule); color: var(--muted); }
+.st-pending { background: var(--warn-soft); color: var(--warn); }
+.st-approved, .st-demo { background: var(--good-soft); color: var(--good); }
+.st-sent, .st-replied { background: var(--blue-soft); color: var(--blue); }
+.st-rejected { background: var(--bad-soft); color: var(--bad); }
+.draft { background: var(--paper); border-left: 3px solid var(--rule); padding: 8px 12px; white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 0 4px 4px 0; }
+textarea, input[type=text], select { width: 100%; box-sizing: border-box; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 8px; }
+textarea { min-height: 96px; resize: vertical; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { border: 1px solid var(--rule); background: var(--card); border-radius: 4px; padding: 7px 14px; cursor: pointer; }
+.btn.go { background: var(--good); color: #fff; border-color: var(--good); }
+.btn.no { color: var(--bad); border-color: var(--bad); }
+.btn.pri { background: var(--blue); color: #fff; border-color: var(--blue); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.go, :root:not([data-theme="light"]) .btn.pri { color: #0c1220; } }
+:root[data-theme="dark"] .btn.go, :root[data-theme="dark"] .btn.pri { color: #0c1220; }
+.empty, .note { border: 1px dashed var(--rule); border-radius: 6px; padding: 18px; color: var(--muted); }
+.note { border-style: solid; background: var(--card); margin-top: 16px; }
+label { display: block; font-weight: 600; margin: 14px 0 4px; }
+.log { list-style: none; padding: 0; margin: 16px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.log li { display: flex; flex-wrap: wrap; gap: 4px 12px; border-bottom: 1px solid var(--rule); padding: 6px 0; }
+.log time { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 9.5em; }
+pre.brief { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--card); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; font: inherit; }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: no-preference) { .item { transition: border-color .15s; } .item:hover { border-color: var(--blue); } }
+</style></head><body>
+<main>
+  <h1>ExamKeep Outreach Queue</h1>
+  <p class="sub">The agent drafts. You approve, edit or reject. A person sends every message from the real account. Nothing here sends anything.</p>
+  <div class="strip" id="strip" aria-live="polite"></div>
+  <nav role="tablist" id="tabs">
+    <button role="tab" data-tab="queue" aria-selected="true">Queue</button>
+    <button role="tab" data-tab="criteria" aria-selected="false">Criteria</button>
+    <button role="tab" data-tab="brief" aria-selected="false">Agent brief</button>
+    <button role="tab" data-tab="log" aria-selected="false">Log</button>
+  </nav>
+
+  <section id="tab-queue">
+    <div class="actions" style="margin-top:16px"><label for="run-n" style="margin:0;font-weight:400">Find</label><select id="run-n" style="width:auto"><option>3</option><option selected>5</option><option>10</option></select><button class="btn pri" id="run">Find more schools</button><span class="meta" id="job" role="status"></span></div>
+    <div class="filters" id="filters"></div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <section id="tab-criteria" hidden>
+    <p class="note">The agent reads these before every batch. Change them and the next batch follows.</p>
+    <label for="c-area">Where to look</label>
+    <textarea id="c-area"></textarea>
+    <label for="c-fit">Who to prefer (Tier A and B)</label>
+    <textarea id="c-fit"></textarea>
+    <label for="c-skip">Who to skip</label>
+    <textarea id="c-skip"></textarea>
+    <p class="actions" style="margin-top:14px"><button class="btn pri" id="c-save">Save criteria</button><span class="meta" id="c-state" role="status"></span></p>
+  </section>
+
+  <section id="tab-brief" hidden>
+    <p class="note">This is the standing brief for the marketing agent: what it knows, what it must never do, and how it fills this queue.</p>
+    <p class="actions"><button class="btn" id="b-copy">Copy brief</button><span class="meta" id="b-state" role="status"></span></p>
+    <pre class="brief" id="brief"></pre>
+  </section>
+
+  <section id="tab-log" hidden>
+    <p class="note">Every approval, edit, rejection and outcome, newest first.</p>
+    <ul class="log" id="log"></ul>
+  </section>
+</main>
+<script src="/app.js"></script></body></html>

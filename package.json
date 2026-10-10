@@ -1,0 +1,9 @@
+{
+  "name": "examkeep-outreach-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone marketing research and drafting agent with an approval queue. Drafts only; never sends.",
+  "scripts": { "start": "node server.mjs", "test": "node --test test/" },
+  "engines": { "node": ">=22" }
+}
