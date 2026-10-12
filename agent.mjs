@@ -85,11 +85,11 @@ export async function readSchool(store, env, cand, fetchImpl = fetch) {
 }
 
 export function draftOk(d) {
-  return typeof d === 'string' && d.length > 60 && d.length < 800 && !/https?:|www\.|₦|\bN\s?\d|naira|price|\bfree\b/i.test(d) && !/our lady|ola maryway/i.test(d);
+  return typeof d === 'string' && d.length > 60 && d.length < 800 && !/https?:|www\.|₦|\bN\s?\d|naira|price|\bfree\b/i.test(d) && !/our lady|ola maryway|founder/i.test(d);
 }
 
 export async function draftMessage(store, env, p) {
-  const prompt = `${BRIEF}\nWrite a three-line first message from Haneef (founder) to the proprietor or principal of ${p.name}. Line 1 gives one specific, true reason for writing, taken only from this fact: ${p.reason}\nLine 2 states what ExamKeep does using only the allowed claims. Line 3 asks: "May I show you in 15 minutes at your school? - Haneef". Plain, polite Nigerian business English, no flattery, no emoji. Return only the message.`;
+  const prompt = `${BRIEF}\nWrite a three-line first message from Haneef at ExamKeep to the proprietor or principal of ${p.name}. Line 1 starts exactly with "Good day. I am Haneef from ExamKeep." and then gives one specific, true reason for writing, taken only from this fact: ${p.reason}\nLine 2 states what ExamKeep does using only the allowed claims. Line 3 asks: "May I show you in 15 minutes at your school? - Haneef, ExamKeep". Plain, polite Nigerian business English, no flattery, no emoji. Return only the message.`;
   const d = (await ask(store, env, null, { contents: [{ role: 'user', parts: [{ text: prompt }] }] })).trim();
   if (!draftOk(d)) throw new Error('draft broke a rule (price, link or forbidden name)');
   return d;

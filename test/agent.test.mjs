@@ -121,3 +121,13 @@ test('OpenAI-compatible provider drafts a school added by hand; search is refuse
     assert.match(s2.error, /cannot search the web/);
   } finally { globalThis.fetch = realFetch; }
 });
+
+test('old drafts get the sender and company named once', () => {
+  const store = openStore(tmp());
+  store.state.prospects = { a: { id: 'a', name: 'A', status: 'pending', draft: 'Good day. I saw your lab.\nExamKeep runs exams.\nMay I show you in 15 minutes at your school? - Haneef' } };
+  createServer({ ...ENV }, store);
+  assert.match(store.state.prospects.a.draft, /^Good day\. I am Haneef from ExamKeep\. I saw/);
+  assert.match(store.state.prospects.a.draft, /- Haneef, ExamKeep$/);
+  createServer({ ...ENV }, store);
+  assert.equal((store.state.prospects.a.draft.match(/I am Haneef/g) || []).length, 1);
+});

@@ -18,6 +18,13 @@ export function createServer(env = process.env, store = openStore(env.DATA_FILE 
     store.state.prospects = JSON.parse(readFileSync(join(here, 'seed.json'), 'utf8'));
     store.save();
   }
+  // One-time tidy: drafts written before the sign-off rule get the sender's company named.
+  for (const p of Object.values(store.state.prospects)) {
+    if (!['pending', 'approved'].includes(p.status) || typeof p.draft !== 'string') continue;
+    let d = p.draft.replace(/- Haneef\s*$/, '- Haneef, ExamKeep');
+    if (!/ExamKeep\./.test(d.split('\n')[0]) && /^Good day\.\s/.test(d)) d = d.replace(/^Good day\.\s/, 'Good day. I am Haneef from ExamKeep. ');
+    if (d !== p.draft) { p.draft = d; store.log(p.name, 'sender line updated'); store.save(); }
+  }
   const want = Buffer.from(env.OUTREACH_PASSWORD);
   const authed = (req) => {
     const h = req.headers.authorization || '';
